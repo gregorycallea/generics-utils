@@ -1,17 +1,15 @@
 package com.github.gregorycallea.generics;
 
-import sun.reflect.generics.reflectiveObjects.TypeVariableImpl;
-
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
+import java.lang.reflect.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Generics utility methods
  *
  * @author gregorycallea <gregory.callea@hotmail.it>
+ *
  * @since 2019-02-15 yyyy/mm/dd
  */
 public class GenericsUtils {
@@ -48,10 +46,41 @@ public class GenericsUtils {
         } else if (targetClassParametersNumber - 1 < paramTypeNumber)
             throw new GenericsException(String.format("Target class [%s] has parameters type which index start from [0] to [%s]. You requested instead parameter with index [%s]", rootClass, paramTypeNumber - 1, targetClassParametersNumber));
 
-        final Type type = analyzeParameterizedTypes(klass, klass, rootClass, paramTypeNumber, null);
-        if (type instanceof TypeVariableImpl)
+        Type type = analyzeParameterizedTypes(klass, klass, rootClass, paramTypeNumber, null);
+        if (!isDefined(type))
             throw new GenericsException(String.format("Parameter [%s] with index [%d] defined on class [%s] has not been valued yet on child class [%s]", type, paramTypeNumber, rootClass.getName(), klass.getName()));
         return type;
+    }
+
+    /**
+     * Check if specified type is defined
+     *
+     * @param type The input type
+     * @return True it type is defined. Otherwise false.
+     */
+    private static boolean isDefined(Type type) {
+        if (type instanceof Class)
+            return true;
+        if (type instanceof GenericArrayType)
+            return isDefined(((GenericArrayType) type).getGenericComponentType());
+        if (type instanceof WildcardType) {
+            for (final Type lowerBound : ((WildcardType) type).getLowerBounds()) {
+                if (!isDefined(lowerBound))
+                    return false;
+            }
+            for (final Type upperBound : ((WildcardType) type).getUpperBounds()) {
+                if (!isDefined(upperBound))
+                    return false;
+            }
+            return true;
+        }
+        if (!(type instanceof ParameterizedType))
+            return false;
+        for (final Type typeArgument : ((ParameterizedType) type).getActualTypeArguments()) {
+            if (!isDefined(typeArgument))
+                return false;
+        }
+        return true;
     }
 
     /**
@@ -69,10 +98,10 @@ public class GenericsUtils {
     public static Type analyzeParameterizedTypes(final Class klass, final Class targetClass, final Class rootClass, final int paramTypeNumber, Map<Integer, Type> childClassTypes) throws GenericsException {
 
         Type superclassType = klass.getGenericSuperclass();
-        Map<TypeVariable, Type> currentClassTypes = new HashMap<>();
+        Map<TypeVariable<?>, Type> currentClassTypes = new HashMap<>();
         int z = 0;
-        for (TypeVariable variable : klass.getTypeParameters()) {
-            if (childClassTypes != null) {
+        if (childClassTypes != null) {
+            for (TypeVariable<?> variable : klass.getTypeParameters()) {
                 currentClassTypes.put(variable, childClassTypes.get(z));
                 z++;
             }
@@ -84,8 +113,27 @@ public class GenericsUtils {
             for (final Type argType : ((ParameterizedType) superclassType).getActualTypeArguments()) {
                 if (argType instanceof Class) {
                     superClassesTypes.put(i, argType);
+                } else if (argType instanceof GenericArrayType) {
+                    final Type arrayComponentType = childClassTypes.get(i);
+                    Class<?> rawArrayComponentType;
+                    boolean parametrized = arrayComponentType instanceof ParameterizedType;
+                    if (parametrized) {
+                        rawArrayComponentType = (Class<?>) ((ParameterizedType) arrayComponentType).getRawType();
+                    } else if (arrayComponentType instanceof Class) {
+                        rawArrayComponentType = (Class<?>) arrayComponentType;
+                    } else {
+                        throw new GenericsException("Array can't be of generic type");
+                    }
+                    // TODO Add safety check if argType.getGenericComponentType() is assignable to arrayComponentType
+                    Class<?> arrayClassType = Array.newInstance(rawArrayComponentType, 0).getClass(); // rawArrayComponentType.arrayType()
+                    Type arrayType = parametrized ? new ResolvedGenericArrayType(arrayComponentType) : arrayClassType;
+                    superClassesTypes.put(i, arrayType);
                 } else {
-                    superClassesTypes.put(i, currentClassTypes.containsKey(argType) ? currentClassTypes.get(argType) : argType);
+                    if(currentClassTypes.containsKey(argType)){
+                        superClassesTypes.put(i, currentClassTypes.get(argType));
+                    }else{
+                        superClassesTypes.put(i, argType);
+                    }
                 }
                 i++;
             }
@@ -99,6 +147,41 @@ public class GenericsUtils {
         }
         return childClassTypes.get(paramTypeNumber);
 
+    }
+
+    /**
+     * The specific resolved generic array type class
+     */
+    private static class ResolvedGenericArrayType implements GenericArrayType {
+        private final Type genericComponentType;
+
+        ResolvedGenericArrayType(Type genericComponentType) {
+            this.genericComponentType = genericComponentType;
+        }
+
+        @Override
+        public Type getGenericComponentType() {
+            return genericComponentType;
+        }
+
+        @Override
+        public String toString() {
+            return getGenericComponentType().toString() + "[]";
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (o instanceof GenericArrayType) {
+                GenericArrayType that = (GenericArrayType) o;
+                return Objects.equals(genericComponentType, that.getGenericComponentType());
+            } else
+                return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(genericComponentType);
+        }
     }
 
     /**

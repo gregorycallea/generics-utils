@@ -131,11 +131,40 @@ public class GenericsUtilsTest {
         }
     }
 
+    //First child hierarchy
+
+    class ArrayGenericRequestHandler<Y> extends AbstractRequestHandler<Y[], String> {
+        public ArrayGenericRequestHandler(String inputJson) throws GenericsException {
+            super(inputJson);
+        }
+    }
+
+    class ArrayRequestHandlerList extends ArrayGenericRequestHandler<List<? extends String>> {
+        public ArrayRequestHandlerList(String inputJson) throws GenericsException {
+            super(inputJson);
+        }
+    }
+
+    class WeirdArrayRequestHandlerList<Y> extends ArrayGenericRequestHandler<List<? extends Y>> {
+        public WeirdArrayRequestHandlerList(String inputJson) throws GenericsException {
+            super(inputJson);
+        }
+    }
+    class WeirdArrayRequestHandlerListImpl extends WeirdArrayRequestHandlerList<List<String>> {
+        public WeirdArrayRequestHandlerListImpl(String inputJson) throws GenericsException {
+            super(inputJson);
+        }
+    }
+
+    //Second child hierarchy
+
     class WorkerRequestHandler extends AbstractRequestHandler<List<String>, Boolean> {
         public WorkerRequestHandler(String inputJson) throws GenericsException {
             super(inputJson);
         }
     }
+
+    //Third chield hierarchy
 
     abstract class AbstractUserRequestHandler<I extends User,O> extends AbstractRequestHandler<I,O>{
         public AbstractUserRequestHandler(String inputJson) throws GenericsException {
@@ -175,6 +204,11 @@ public class GenericsUtilsTest {
         final List<String> inputRequest2Obj = new WorkerRequestHandler(request2Json).input;
         if (!worker.equals(inputRequest2Obj))
             throw new Exception("Input2 json has not been parsed correctly from handler!");
+
+        Type parameterizedType = GenericsUtils.getParameterizedType(ArrayRequestHandlerList.class, AbstractRequestHandler.class, 0);
+        assertThat(parameterizedType.toString(), is("java.util.List<? extends java.lang.String>[]"));
+
+
     }
 
     //=====
@@ -207,7 +241,7 @@ public class GenericsUtilsTest {
     private class BaseA<G, H> extends Base<H, Boolean, G> {
     }
 
-    //First hierarchy childs
+    //First child hierarchy
 
     private class BaseB<T> extends BaseA<T, String> {
     }
@@ -242,7 +276,7 @@ public class GenericsUtilsTest {
     private class BaseN extends BaseM{
     }
 
-    //Second hierarchy childs
+    //Second child hierarchy
 
     private class BaseB2<T> extends BaseA<T, List<String>> {
     }
