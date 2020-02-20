@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import org.junit.Test;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -129,6 +131,12 @@ public class GenericsUtilsTest {
         }
     }
 
+    class WorkerRequestHandler extends AbstractRequestHandler<List<String>, Boolean> {
+        public WorkerRequestHandler(String inputJson) throws GenericsException {
+            super(inputJson);
+        }
+    }
+
     abstract class AbstractUserRequestHandler<I extends User,O> extends AbstractRequestHandler<I,O>{
         public AbstractUserRequestHandler(String inputJson) throws GenericsException {
             super(inputJson);
@@ -158,6 +166,15 @@ public class GenericsUtilsTest {
         final Teacher inputRequestObj = new TeacherRequestHandler(requestJson).input;
         if(!teacher.equals(inputRequestObj))
             throw new Exception("Input json has not been parsed correctly from handler!");
+
+        final List<String> worker = new ArrayList<>();
+        worker.add("name");
+        worker.add("surname");
+        final String request2Json = new Gson().toJson(worker);
+
+        final List<String> inputRequest2Obj = new WorkerRequestHandler(request2Json).input;
+        if (!worker.equals(inputRequest2Obj))
+            throw new Exception("Input2 json has not been parsed correctly from handler!");
     }
 
     //=====
@@ -189,6 +206,8 @@ public class GenericsUtilsTest {
 
     private class BaseA<G, H> extends Base<H, Boolean, G> {
     }
+
+    //First hierarchy childs
 
     private class BaseB<T> extends BaseA<T, String> {
     }
@@ -223,14 +242,23 @@ public class GenericsUtilsTest {
     private class BaseN extends BaseM{
     }
 
+    //Second hierarchy childs
+
+    private class BaseB2<T> extends BaseA<T, List<String>> {
+    }
+
+    private class BaseC2 extends BaseB2<Integer> {
+    }
+
+    //Others classes
     private class NotBaseChild {
     }
 
     @Test
-    public void testCase2() throws GenericsException {
+    public void testCase2() throws Exception {
 
         Type parameterizedType;
-        
+
         parameterizedType = GenericsUtils.getParameterizedType(BaseG.class, Base.class, 0);
         assertThat((((Class) parameterizedType).getSimpleName()), is("String"));
 
@@ -246,9 +274,13 @@ public class GenericsUtilsTest {
         parameterizedType = GenericsUtils.getParameterizedType(BaseH.class, Base.class, 2);
         assertThat((((Class) parameterizedType).getSimpleName()), is("Integer"));
 
+        parameterizedType = GenericsUtils.getParameterizedType(BaseB2.class, Base.class, 0);
+        assertThat(parameterizedType.toString(), is("java.util.List<java.lang.String>"));
+
         //Expected exception => Class with no target class on parents hierarchy
         try {
             GenericsUtils.getParameterizedType(NotBaseChild.class, Base.class, 2);
+            throw new Exception("Exception should be raised because class with no target class on parents hierarchy");
         } catch (GenericsException e) {
             printExceptedException(e);
         }
@@ -256,6 +288,7 @@ public class GenericsUtilsTest {
         //Expected exception => Generic Parameter with index 2 declared on Base class has not yet a type assigned at class BaseB
         try {
             GenericsUtils.getParameterizedType(BaseB.class, Base.class, 2);
+            throw new Exception("Exception should be raised because generic Parameter with index 2 declared on Base class has not yet a type assigned at class BaseB");
         } catch (GenericsException e) {
             printExceptedException(e);
         }
@@ -264,6 +297,7 @@ public class GenericsUtilsTest {
         //Expected exception => Base declares 3 generic parameters. So available index are from 0 to 2.
         try {
             GenericsUtils.getParameterizedType(BaseF.class, Base.class, 3);
+            throw new Exception("Exception should be raised because Base declares 3 generic parameters. So available index are from 0 to 2.");
         } catch (GenericsException e) {
             printExceptedException(e);
         }
@@ -271,13 +305,14 @@ public class GenericsUtilsTest {
         //Expected exception => BaseE doesn't declare generic parameters
         try {
             GenericsUtils.getParameterizedType(BaseF.class, BaseE.class, 2);
+            throw new Exception("Exception should be raised because BaseE doesn't declare generic parameters");
         } catch (GenericsException e) {
             printExceptedException(e);
         }
 
         parameterizedType = GenericsUtils.getParameterizedType(BaseN.class, Base.class, 2);
         assertThat((((Class) parameterizedType).getSimpleName()), is("Integer"));
-        
+
     }
 
     /**

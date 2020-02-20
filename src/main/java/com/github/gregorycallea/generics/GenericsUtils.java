@@ -1,5 +1,7 @@
 package com.github.gregorycallea.generics;
 
+import sun.reflect.generics.reflectiveObjects.TypeVariableImpl;
+
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -46,8 +48,8 @@ public class GenericsUtils {
         } else if (targetClassParametersNumber - 1 < paramTypeNumber)
             throw new GenericsException(String.format("Target class [%s] has parameters type which index start from [0] to [%s]. You requested instead parameter with index [%s]", rootClass, paramTypeNumber - 1, targetClassParametersNumber));
 
-        Type type = analyzeParameterizedTypes(klass, klass, rootClass, paramTypeNumber, null);
-        if (!(type instanceof Class))
+        final Type type = analyzeParameterizedTypes(klass, klass, rootClass, paramTypeNumber, null);
+        if (type instanceof TypeVariableImpl)
             throw new GenericsException(String.format("Parameter [%s] with index [%d] defined on class [%s] has not been valued yet on child class [%s]", type, paramTypeNumber, rootClass.getName(), klass.getName()));
         return type;
     }
