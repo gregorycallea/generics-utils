@@ -44,11 +44,11 @@ public class GenericsUtils {
         if (targetClassParametersNumber == 0) {
             throw new GenericsException(String.format("Target class [%s] has no parameters type", rootClass.getName()));
         } else if (targetClassParametersNumber - 1 < paramTypeNumber)
-            throw new GenericsException(String.format("Target class [%s] has parameters type which index start from [0] to [%s]. You requested instead [%s]", rootClass, paramTypeNumber - 1, targetClassParametersNumber));
+            throw new GenericsException(String.format("Target class [%s] has parameters type which index start from [0] to [%s]. You requested instead parameter with index [%s]", rootClass, paramTypeNumber - 1, targetClassParametersNumber));
 
-        Type type = analyzeParameterizedTypes(klass, rootClass, paramTypeNumber, null);
+        Type type = analyzeParameterizedTypes(klass, klass, rootClass, paramTypeNumber, null);
         if (!(type instanceof Class))
-            throw new GenericsException(String.format("Parameter with index [%d] on class [%s] is not a concrete class starting from child class [%s]. It is instead a generic with name [%s]", paramTypeNumber, rootClass.getName(), klass.getName(), type));
+            throw new GenericsException(String.format("Parameter [%s] with index [%d] defined on class [%s] has not been valued yet on child class [%s]", type, paramTypeNumber, rootClass.getName(), klass.getName()));
         return type;
     }
 
@@ -56,15 +56,15 @@ public class GenericsUtils {
      * Given a target class if recursively searches and navigates on its hierarchy until the specified root class and return the type of parameter type with specific number
      * On each step, it passes the child class types values on the next step in order to know what is the type implemented by the child class on the parent one.
      *
-     * @param klass           The target class
+     * @param klass           The recursive step class
+     * @param targetClass     The target class
      * @param rootClass       The parameterized root class
      * @param paramTypeNumber The parameter type number on the parameterized root class
      * @param childClassTypes The child class types map
      * @return The requested type
-     *
      * @throws GenericsException
      */
-    public static Type analyzeParameterizedTypes(final Class klass, final Class rootClass, final int paramTypeNumber, Map<Integer, Type> childClassTypes) {
+    public static Type analyzeParameterizedTypes(final Class klass, final Class targetClass, final Class rootClass, final int paramTypeNumber, Map<Integer, Type> childClassTypes) throws GenericsException {
 
         Type superclassType = klass.getGenericSuperclass();
         Map<TypeVariable, Type> currentClassTypes = new HashMap<>();
@@ -89,8 +89,12 @@ public class GenericsUtils {
             }
         }
 
-        if (klass != rootClass)
-            return analyzeParameterizedTypes(klass.getSuperclass(), rootClass, paramTypeNumber, superClassesTypes);
+        if (klass != rootClass) {
+            final Class superClass = klass.getSuperclass();
+            if (superClass == null)
+                throw new GenericsException(String.format("Class [%s] not found on class parent hierarchy [%s]", rootClass,targetClass));
+            return analyzeParameterizedTypes(superClass,targetClass, rootClass, paramTypeNumber, superClassesTypes);
+        }
         return childClassTypes.get(paramTypeNumber);
 
     }

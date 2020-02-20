@@ -223,6 +223,9 @@ public class GenericsUtilsTest {
     private class BaseN extends BaseM{
     }
 
+    private class NotBaseChild {
+    }
+
     @Test
     public void testCase2() throws GenericsException {
 
@@ -243,11 +246,18 @@ public class GenericsUtilsTest {
         parameterizedType = GenericsUtils.getParameterizedType(BaseH.class, Base.class, 2);
         assertThat((((Class) parameterizedType).getSimpleName()), is("Integer"));
 
+        //Expected exception => Class with no target class on parents hierarchy
+        try {
+            GenericsUtils.getParameterizedType(NotBaseChild.class, Base.class, 2);
+        } catch (GenericsException e) {
+            printExceptedException(e);
+        }
+
         //Expected exception => Generic Parameter with index 2 declared on Base class has not yet a type assigned at class BaseB
         try {
             GenericsUtils.getParameterizedType(BaseB.class, Base.class, 2);
         } catch (GenericsException e) {
-            System.out.println("Excepted exception has been raised: " + e.getMessage());
+            printExceptedException(e);
         }
 
 
@@ -255,20 +265,27 @@ public class GenericsUtilsTest {
         try {
             GenericsUtils.getParameterizedType(BaseF.class, Base.class, 3);
         } catch (GenericsException e) {
-            System.out.println("Excepted exception has been raised: " + e.getMessage());
+            printExceptedException(e);
         }
 
         //Expected exception => BaseE doesn't declare generic parameters
         try {
             GenericsUtils.getParameterizedType(BaseF.class, BaseE.class, 2);
         } catch (GenericsException e) {
-            System.out.println("Excepted exception has been raised: " + e.getMessage());
+            printExceptedException(e);
         }
 
         parameterizedType = GenericsUtils.getParameterizedType(BaseN.class, Base.class, 2);
         assertThat((((Class) parameterizedType).getSimpleName()), is("Integer"));
+        
+    }
 
-
+    /**
+     * Prints excepted exception message:
+     * @param e The expected exception raised
+     */
+    private void printExceptedException(final Exception e){
+        System.out.println("Excepted exception has been raised: " + e.getMessage());
     }
 
 }
