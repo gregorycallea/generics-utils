@@ -124,7 +124,6 @@ public class GenericsUtils {
                     } else {
                         throw new GenericsException("Array can't be of generic type");
                     }
-                    // TODO Add safety check if argType.getGenericComponentType() is assignable to arrayComponentType
                     Class<?> arrayClassType = Array.newInstance(rawArrayComponentType, 0).getClass(); // rawArrayComponentType.arrayType()
                     Type arrayType = parametrized ? new ResolvedGenericArrayType(arrayComponentType) : arrayClassType;
                     superClassesTypes.put(i, arrayType);
