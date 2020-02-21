@@ -4,8 +4,9 @@ import com.google.gson.Gson;
 import org.junit.Test;
 
 import java.lang.reflect.Type;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.Objects;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -232,65 +233,70 @@ public class GenericsUtilsTest {
     //
     //=====
 
-    private class Base<I, E, F> {
-        I var1;
-        E var2;
-        F var3;
-    }
+    private class Base<I, E, F> {}
 
-    private class BaseA<G, H> extends Base<H, Boolean, G> {
-    }
+    private class BaseA<G, H> extends Base<H, Boolean, G> {}
 
     //First child hierarchy
 
-    private class BaseB<T> extends BaseA<T, String> {
-    }
+    private class BaseB<T> extends BaseA<T, String> {}
 
-    private class BaseC<H> extends BaseB<H> {
-    }
+    private class BaseC<H> extends BaseB<H> {}
 
-    private class BaseD extends BaseC<Integer> {
-    }
+    private class BaseD extends BaseC<Integer> {}
 
-    private class BaseE extends BaseD {
-    }
+    private class BaseE extends BaseD {}
 
-    private class BaseF extends BaseE {
-    }
+    private class BaseF extends BaseE {}
 
-    private class BaseG<H,I> extends BaseF{
-    }
+    private class BaseG<H, I> extends BaseF {}
 
-    private class BaseH<H> extends BaseG<H,Double>{
-    }
+    private class BaseH<H> extends BaseG<H, Double> {}
 
-    private class BaseI<T> extends BaseH<T>{
-    }
+    private class BaseI<T> extends BaseH<T> {}
 
-    private class BaseL<J> extends BaseH<J>{
-    }
+    private class BaseL<J> extends BaseH<J> {}
 
-    private class BaseM extends BaseL<Float>{
-    }
+    private class BaseM extends BaseL<Float> {}
 
-    private class BaseN extends BaseM{
-    }
+    private class BaseN extends BaseM {}
 
     //Second child hierarchy
 
-    private class BaseB2<T> extends BaseA<T, List<String>> {
-    }
+    private class BaseB2<T> extends BaseA<T, List<String>> {}
 
-    private class BaseC2 extends BaseB2<Integer> {
-    }
+    private class BaseC2 extends BaseB2<Integer> {}
 
     //Others classes
-    private class NotBaseChild {
+    private class NotBaseChild {}
+
+    // nested generics
+    private class BaseWithArrayA<A> extends Base<A[], A[][], A> {}
+
+    private class BaseWithArrayB extends BaseWithArrayA<Void> {}
+
+    private class BaseWithNestedGenericA<A> extends Base<List<A>, List<A[]>, List<Void>[]> {}
+
+    private class BaseWithNestedGenericB extends BaseWithNestedGenericA<Void> {}
+
+    private class BaseWithGenericArrayA<A> extends Base<List<Void>[], List<? extends A>[], List<? extends A[][][]>[][][]> {}
+
+    private class BaseWithGenericArrayB extends BaseWithGenericArrayA<Void> {}
+
+    // invalid nested generic
+    private class TopClassWithGeneric<T> {
+        private class NestedBase<X> {}
+
+        private class NestedUsage extends NestedBase<T> {}
     }
+
+    // TODO: possible case to handle:
+    // having "TopClassExtendingOther" class and "NestedUsage" class you should be able to get type of X for "NestedBase"
+    // but that will require special handling
+    private class TopClassExtendingOther extends TopClassWithGeneric<Void> {}
 
     @Test
     public void testCase2() throws Exception {
-
         Type parameterizedType;
 
         parameterizedType = GenericsUtils.getParameterizedType(BaseG.class, Base.class, 0);
@@ -308,8 +314,32 @@ public class GenericsUtilsTest {
         parameterizedType = GenericsUtils.getParameterizedType(BaseH.class, Base.class, 2);
         assertThat((((Class) parameterizedType).getSimpleName()), is("Integer"));
 
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithArrayB.class, Base.class, 0);
+        assertThat((((Class) parameterizedType).getSimpleName()), is("Void[]"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithArrayB.class, Base.class, 1);
+        assertThat((((Class) parameterizedType).getSimpleName()), is("Void[][]"));
+
         parameterizedType = GenericsUtils.getParameterizedType(BaseB2.class, Base.class, 0);
         assertThat(parameterizedType.toString(), is("java.util.List<java.lang.String>"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithNestedGenericB.class, Base.class, 0);
+        assertThat(parameterizedType.toString(), is("java.util.List<java.lang.Void>"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithNestedGenericB.class, Base.class, 1);
+        assertThat(parameterizedType.toString(), is("java.util.List<java.lang.Void[]>"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithNestedGenericB.class, Base.class, 2);
+        assertThat(parameterizedType.toString(), is("java.util.List<java.lang.Void>[]"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithGenericArrayB.class, Base.class, 0);
+        assertThat(parameterizedType.toString(), is("java.util.List<java.lang.Void>[]"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithGenericArrayB.class, Base.class, 1);
+        assertThat(parameterizedType.toString(), is("java.util.List<? extends java.lang.Void>[]"));
+
+        parameterizedType = GenericsUtils.getParameterizedType(BaseWithGenericArrayB.class, Base.class, 2);
+        assertThat(parameterizedType.toString(), is("java.util.List<? extends java.lang.Void[][][]>[][][]"));
 
         //Expected exception => Class with no target class on parents hierarchy
         try {
@@ -339,6 +369,14 @@ public class GenericsUtilsTest {
         //Expected exception => BaseE doesn't declare generic parameters
         try {
             GenericsUtils.getParameterizedType(BaseF.class, BaseE.class, 2);
+            throw new Exception("Exception should be raised because BaseE doesn't declare generic parameters");
+        } catch (GenericsException e) {
+            printExceptedException(e);
+        }
+
+        //Expected exception => generic is from different unresolved generic
+        try {
+            GenericsUtils.getParameterizedType(TopClassWithGeneric.NestedUsage.class, TopClassWithGeneric.NestedBase.class, 0);
             throw new Exception("Exception should be raised because BaseE doesn't declare generic parameters");
         } catch (GenericsException e) {
             printExceptedException(e);
